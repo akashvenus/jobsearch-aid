@@ -1,0 +1,184 @@
+.container {
+  width: 300px;
+  padding: 16px;
+  font-family: Arial, sans-serif;
+}
+
+h2 {
+  margin-bottom: 12px;
+}
+
+.hint {
+  color: #666;
+  font-size: 14px;
+  margin-bottom: 16px;
+}
+
+.upload-section {
+  margin: 16px 0;
+}
+
+.upload-btn {
+  display: inline-block;
+  padding: 10px 16px;
+  background: #2563eb;
+  color: white;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+  text-align: center;
+}
+
+.upload-btn:hover {
+  background: #1d4ed8;
+}
+
+.upload-btn:disabled {
+  background: #93c5fd;
+  cursor: not-allowed;
+}
+
+.resume-selector {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.resume-selector select {
+  flex: 1;
+  padding: 8px;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  font-size: 14px;
+}
+
+.small-btn {
+  padding: 8px 12px;
+  background: #2563eb;
+  color: white;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 16px;
+}
+
+.small-btn:hover {
+  background: #1d4ed8;
+}
+
+.active-resume {
+  font-size: 13px;
+  color: #666;
+  margin-bottom: 16px;
+}
+
+.error {
+  color: #dc2626;
+  font-size: 13px;
+  margin: 8px 0;
+}
+
+.score-card {
+  background: #f3f4f6;
+  padding: 12px;
+  border-radius: 8px;
+  margin-bottom: 16px;
+  text-align: center;
+}
+
+.score {
+  font-size: 28px;
+  font-weight: bold;
+  color: #2563eb;
+}
+
+.score-ring {
+  width: 100px;
+  height: 100px;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto;
+}
+
+.score-ring svg {
+  position: absolute;
+  top: 0;
+  left: 0;
+}
+
+.score-ring .score-number {
+  font-size: 20px;
+  font-weight: bold;
+  z-index: 1;
+}
+
+.score-great {
+  color: #22c55e;
+}
+
+.score-good {
+  color: #eab308;
+}
+
+.score-okay {
+  color: #f97316;
+}
+
+.score-bad {
+  color: #ef4444;
+}
+
+.keywords {
+  margin-bottom: 16px;
+}
+
+.keywords h3 {
+  font-size: 14px;
+  margin-bottom: 8px;
+}
+
+.keywords ul {
+  padding-left: 16px;
+  margin: 0;
+}
+
+.keywords li {
+  margin-bottom: 4px;
+  font-size: 13px;
+}
+
+.keywords p {
+  color: #666;
+  font-size: 13px;
+}
+
+.resume-list {
+  margin: 16px 0;
+}
+
+.resume-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px;
+  border-bottom: 1px solid #eee;
+}
+
+.resume-item span {
+  font-size: 13px;
+}
+
+.delete-btn {
+  background: #ef4444;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  padding: 4px 8px;
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.delete-btn:hover {
+  background: #dc2626;
+}

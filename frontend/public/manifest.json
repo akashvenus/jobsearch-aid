@@ -1,0 +1,32 @@
+{
+    "manifest_version": 3,
+    "name": "Jobsearch-aid-ext",
+    "version": "1.0",
+    "description": "Helps extract the job title and job description and match with backend",
+
+    "action": {
+        "default_popup": "index.html"
+    },
+
+    "background" : {
+        "service_worker" : "background.js",
+        "type": "module"
+    },
+
+    "content_scripts" : [
+        {
+            "matches": ["https://www.linkedin.com/jobs/*"],
+            "js": ["content.js"]
+        }
+    ],
+
+    "permissions": [
+        "activeTab",
+        "scripting",
+        "storage"
+    ],
+    
+    "host_permissions":[
+        "http://localhost:8000/*"
+    ]
+}
