@@ -99,8 +99,8 @@ function App() {
         }
       }
       if (areaName === 'session' && changes.analysis) {
-        const data = changes.analysis.newValue as Analysis
-        if (data) setAnalysis(data)
+        const data = changes.analysis.newValue as Analysis | undefined
+        setAnalysis(data || null)
       }
     }
     chrome.storage.onChanged.addListener(handleStorage)
@@ -115,7 +115,6 @@ function App() {
   }, [selectedId])
 
   const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    console.log('This runs here before upload')
     const file = e.target.files?.[0]
     if (!file) return
 
