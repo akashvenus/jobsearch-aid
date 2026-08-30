@@ -1,6 +1,7 @@
 import hashlib
 import json
 import os
+import re
 
 from utils.keywords import extract_keywords_hybrid
 from utils.pdf_text import extract_text_from_pdf
@@ -11,7 +12,7 @@ from utils.text_cleaning import clean_job_description, extract_relevant_job_sect
 
 
 def _normalize_jd(text: str) -> str:
-    return text.lower().strip().replace(r"\s+", " ")
+    return re.sub(r"\s+", " ", text.lower().strip())
 
 
 def _hash_jd(text: str) -> str:
@@ -22,7 +23,7 @@ async def analyze(job_description: str, resume_id: str) -> dict:
     job_clean = clean_job_description(job_description)
     job_relevant = extract_relevant_job_section(job_clean)
 
-    normalized_jd = _normalize_jd(job_relevant)
+    normalized_jd = _normalize_jd(job_description)
     job_hash = _hash_jd(normalized_jd)
     cache_key = f"{resume_id}::{job_hash}"
 
