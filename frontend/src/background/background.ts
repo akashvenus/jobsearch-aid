@@ -20,7 +20,12 @@ async function maybeAnalyze() {
 
     const jobDescription = ((sessionData?.jobDescription ?? "") as string).trim()
 
-    if (!jobDescription || !resumeId) return
+    console.log("[Background] maybeAnalyze called", { hasDescription: !!jobDescription, descLength: jobDescription?.length, resumeId, resumeIdLength: resumeId?.length })
+
+    if (!jobDescription || !resumeId) {
+        console.log("[Background] maybeAnalyze: returning early", { reason: !jobDescription ? "no jobDescription" : "no resumeId" })
+        return
+    }
 
     console.log("Analyzing with:", { resumeId, jobDescription })
 
@@ -57,21 +62,28 @@ async function maybeAnalyze() {
 
 chrome.runtime.onMessage.addListener((message, sender) => {
     (async () => {
+        console.log("[Background] onMessage received", { type: message.type, tabUrl: sender.tab?.url })
         if (message.type === "JOB_DETECTED") {
             const tab = sender.tab
-            if (!tab?.url || !isLinkedInJobsPage(tab.url)) return
+            if (!tab?.url || !isLinkedInJobsPage(tab.url)) {
+                console.log("[Background] JOB_DETECTED ignored - not LinkedIn jobs page", { url: tab?.url })
+                return
+            }
 
-            await chrome.storage.session.set({
-            jobDescription:
-                typeof message.payload === "string"
+            const desc = typeof message.payload === "string"
                 ? message.payload
                 : message.payload?.description || ""
-            })
+
+            console.log("[Background] Setting jobDescription in session storage", { length: desc.length })
+            await chrome.storage.session.set({ jobDescription: desc })
+            console.log("[Background] jobDescription stored")
         }
 
         if (message.type === "RESUME_CHANGED") {
+            console.log("[Background] RESUME_CHANGED", { resumeId: message.payload.resumeId })
             await chrome.storage.local.set({ activeResumeId: message.payload.resumeId })
             await chrome.storage.session.remove("analysis")
+            console.log("[Background] activeResumeId saved, analysis cleared")
         }
 
         await maybeAnalyze()

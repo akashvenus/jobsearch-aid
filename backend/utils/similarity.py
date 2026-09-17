@@ -18,7 +18,7 @@ def semantic_similarity_tfidf(*, job_text: str, resume_text: str) -> float:
     rt = (resume_text or "").strip()
     if not jt or not rt:
         return 0.0
-    vect = TfidfVectorizer(stop_words="english", max_features=5000)
+    vect = TfidfVectorizer(stop_words="english", max_features=150)
     mat = vect.fit_transform([jt, rt])
     sim = cosine_similarity(mat[0:1], mat[1:2])[0][0]
     if sim != sim:  # NaN guard
