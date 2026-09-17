@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import './App.css'
 import { uploadResume, deleteResume } from './services/api'
 import { isLinkedInJobsPage } from './utils/urlCheck'
@@ -14,6 +14,14 @@ type Analysis = {
   missingKeywords: string[]
   strongMatches: string[]
 }
+
+type Toast = {
+  id: number
+  message: string
+  type: 'success' | 'error'
+}
+
+let toastId = 0
 
 function ScoreRing({ score }: { score: number }) {
   const percentage = Math.min(100, Math.max(0, score))
@@ -58,35 +66,63 @@ function ScoreRing({ score }: { score: number }) {
   )
 }
 
+function SkeletonLoader() {
+  return (
+    <div className="score-card">
+      <h3>Match Score</h3>
+      <div className="skeleton skeleton-ring" />
+      <div className="skeleton skeleton-text" style={{ marginBottom: 16 }} />
+      <div style={{ textAlign: 'left' }}>
+        <div className="skeleton skeleton-line" style={{ width: '40%', marginBottom: 12 }} />
+        <div className="skeleton skeleton-line" />
+        <div className="skeleton skeleton-line" />
+        <div className="skeleton skeleton-line" style={{ width: '50%' }} />
+      </div>
+    </div>
+  )
+}
+
 function App() {
   const [resumes, setResumes] = useState<Resume[]>([])
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [analysis, setAnalysis] = useState<Analysis | null>(null)
-  const [error, setError] = useState<string | null>(null)
   const [uploading, setUploading] = useState(false)
   const [isLinkedInPage, setIsLinkedInPage] = useState(true)
+  const [toasts, setToasts] = useState<Toast[]>([])
   const fileInputRef = useRef<HTMLInputElement>(null)
+
+  const addToast = useCallback((message: string, type: 'success' | 'error') => {
+    const id = ++toastId
+    setToasts(prev => [...prev, { id, message, type }])
+    setTimeout(() => {
+      setToasts(prev => prev.filter(t => t.id !== id))
+    }, 3000)
+  }, [])
 
   useEffect(() => {
     async function loadData() {
-      const [tab] = await chrome.tabs.query({ active: true, currentWindow: true })
-      const url = tab?.url || ''
-      const isLinkedIn = isLinkedInJobsPage(url)
-      setIsLinkedInPage(isLinkedIn)
+      try {
+        const [tab] = await chrome.tabs.query({ active: true, currentWindow: true })
+        const url = tab?.url || ''
+        const isLinkedIn = isLinkedInJobsPage(url)
+        setIsLinkedInPage(isLinkedIn)
 
-      if (!isLinkedIn) {
-        setAnalysis(null)
+        if (!isLinkedIn) {
+          setAnalysis(null)
+        }
+
+        const stored = await chrome.storage.local.get(['resumes', 'activeResumeId'])
+        const storedResumes: Resume[] = (stored.resumes as Resume[]) || []
+        const activeId: string = stored.activeResumeId as string
+
+        setResumes(storedResumes)
+        setSelectedId(activeId || (storedResumes.length > 0 ? storedResumes[0].id : null))
+      } catch {
+        addToast('Failed to load data', 'error')
       }
-
-      const stored = await chrome.storage.local.get(['resumes', 'activeResumeId'])
-      const storedResumes: Resume[] = (stored.resumes as Resume[]) || []
-      const activeId: string = stored.activeResumeId as string
-
-      setResumes(storedResumes)
-      setSelectedId(activeId || (storedResumes.length > 0 ? storedResumes[0].id : null))
     }
     loadData()
-  }, [])
+  }, [addToast])
 
   useEffect(() => {
     function handleStorage(changes: { [key: string]: chrome.storage.StorageChange }, areaName: string) {
@@ -119,15 +155,14 @@ function App() {
     if (!file) return
 
     if (file.type !== 'application/pdf') {
-      setError('Only PDF files are allowed')
+      addToast('Only PDF files are allowed', 'error')
       return
     }
     if (resumes.length >= 5) {
-      setError('Maximum 5 resumes allowed')
+      addToast('Maximum 5 resumes allowed', 'error')
       return
     }
     setUploading(true)
-    setError(null)
 
     try {
       const result = await uploadResume(file)
@@ -140,8 +175,9 @@ function App() {
       setResumes(updated)
       setSelectedId(newResume.id)
       await chrome.storage.local.set({ resumes: updated, activeResumeId: newResume.id })
+      addToast(`Resume "${result.fileName}" uploaded`, 'success')
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Upload failed')
+      addToast(err instanceof Error ? err.message : 'Upload failed', 'error')
     } finally {
       setUploading(false)
       if (fileInputRef.current) fileInputRef.current.value = ''
@@ -149,6 +185,7 @@ function App() {
   }
 
   const handleDelete = async (id: string) => {
+    const name = resumes.find(r => r.id === id)?.name || 'Resume'
     try {
       await deleteResume(id)
       const updated = resumes.filter(r => r.id !== id)
@@ -157,160 +194,138 @@ function App() {
         setSelectedId(updated.length > 0 ? updated[0].id : null)
       }
       await chrome.storage.local.set({ resumes: updated, activeResumeId: selectedId === id ? (updated[0]?.id || null) : selectedId })
+      addToast(`"${name}" deleted`, 'success')
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Delete failed')
+      addToast(err instanceof Error ? err.message : 'Delete failed', 'error')
     }
   }
 
   const activeResume = resumes.find(r => r.id === selectedId)
 
-  if (!isLinkedInPage) {
-    return (
-      <div className="container">
-        <h2>Resume Manager</h2>
-        <p className="hint">Please open a LinkedIn job posting</p>
-        <p className="hint">Upload your resume to get started</p>
-        
-        <div className="upload-section">
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept=".pdf"
-            onChange={handleUpload}
-            disabled={uploading}
-            style={{ display: 'none' }}
-            id="file-upload"
-          />
-          <label htmlFor="file-upload" className="upload-btn">
-            {uploading ? 'Uploading...' : 'Upload Resume (PDF)'}
-          </label>
-        </div>
-
-        {resumes.length > 0 && (
-          <div className="resume-list">
-            {resumes.map(r => (
-              <div key={r.id} className="resume-item">
-                <span>{r.name}</span>
-                <button onClick={() => handleDelete(r.id)} className="delete-btn">x</button>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {error && <p className="error">{error}</p>}
-      </div>
-    )
-  }
-
-  if (!selectedId || resumes.length === 0) {
-    return (
-      <div className="container">
-        <h2>Resume Manager</h2>
-        <p className="hint">Upload your resume to get started</p>
-        
-        <div className="upload-section">
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept=".pdf"
-            onChange={handleUpload}
-            disabled={uploading}
-            style={{ display: 'none' }}
-            id="file-upload"
-          />
-          <label htmlFor="file-upload" className="upload-btn">
-            {uploading ? 'Uploading...' : 'Upload Resume (PDF)'}
-          </label>
-        </div>
-
-        {error && <p className="error">{error}</p>}
-      </div>
-    )
-  }
+  const uploadButton = (
+    <div className="upload-section">
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept=".pdf"
+        onChange={handleUpload}
+        disabled={uploading}
+        style={{ display: 'none' }}
+        id="file-upload"
+      />
+      <label htmlFor="file-upload" className="upload-btn">
+        {uploading ? 'Uploading...' : 'Upload Resume (PDF)'}
+      </label>
+    </div>
+  )
 
   return (
     <div className="container">
-      <h2>Resume Manager</h2>
-
-      <div className="resume-selector">
-        <select
-          value={selectedId || ''}
-          onChange={(e) => setSelectedId(e.target.value)}
-        >
-          {resumes.map(r => (
-            <option key={r.id} value={r.id}>
-              {r.name}
-            </option>
-          ))}
-        </select>
-
-        {resumes.length < 5 && (
-          <>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept=".pdf"
-              onChange={handleUpload}
-              disabled={uploading}
-              style={{ display: 'none' }}
-              id="file-upload2"
-            />
-            <label htmlFor="file-upload2" className="small-btn">
-              +
-            </label>
-          </>
-        )}
-
-        {selectedId && resumes.length > 1 && (
-          <button onClick={() => handleDelete(selectedId)} className="delete-btn">x</button>
-        )}
+      <div className="toast-container">
+        {toasts.map(t => (
+          <div key={t.id} className={`toast toast-${t.type}`}>{t.message}</div>
+        ))}
       </div>
 
-      {error && <p className="error">{error}</p>}
-
-      {activeResume && (
-        <p className="active-resume">
-          Active: <strong>{activeResume.name}</strong>
-        </p>
-      )}
-
-      {!analysis ? (
-        <div className="score-card">
-          <h3>Match Score</h3>
-          <p>Analyzing...</p>
-        </div>
+      {!isLinkedInPage ? (
+        <>
+          <h2>Resume Manager</h2>
+          <p className="hint">Please open a LinkedIn job posting</p>
+          <p className="hint">Upload your resume to get started</p>
+          {uploadButton}
+          {resumes.length > 0 && (
+            <div className="resume-list">
+              {resumes.map(r => (
+                <div key={r.id} className="resume-item">
+                  <span>{r.name}</span>
+                  <button onClick={() => handleDelete(r.id)} className="delete-btn">x</button>
+                </div>
+              ))}
+            </div>
+          )}
+        </>
+      ) : !selectedId || resumes.length === 0 ? (
+        <>
+          <h2>Resume Manager</h2>
+          <p className="hint">Upload your resume to get started</p>
+          {uploadButton}
+        </>
       ) : (
         <>
-          <div className="score-card">
-            <h3>Match Score</h3>
-            <ScoreRing score={analysis.score} />
-          </div>
+          <h2>Resume Manager</h2>
 
-          <div className="keywords">
-            <h3>Missing Keywords</h3>
-            {analysis.missingKeywords?.length > 0 ? (
-              <ul>
-                {(analysis.missingKeywords as string[]).map((kw, i) => (
-                  <li key={i}>{String(kw)}</li>
-                ))}
-              </ul>
-            ) : (
-              <p>No missing keywords</p>
+          <div className="resume-selector">
+            <select
+              value={selectedId || ''}
+              onChange={(e) => setSelectedId(e.target.value)}
+            >
+              {resumes.map(r => (
+                <option key={r.id} value={r.id}>
+                  {r.name}
+                </option>
+              ))}
+            </select>
+
+            {resumes.length < 5 && (
+              <>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept=".pdf"
+                  onChange={handleUpload}
+                  disabled={uploading}
+                  style={{ display: 'none' }}
+                  id="file-upload2"
+                />
+                <label htmlFor="file-upload2" className="small-btn">+</label>
+              </>
+            )}
+
+            {selectedId && resumes.length > 1 && (
+              <button onClick={() => handleDelete(selectedId)} className="delete-btn">x</button>
             )}
           </div>
 
-          <div className="keywords">
-            <h3>Strong Matches</h3>
-            {analysis.strongMatches?.length > 0 ? (
-              <ul>
-                {(analysis.strongMatches as string[]).map((kw, i) => (
-                  <li key={i}>{String(kw)}</li>
-                ))}
-              </ul>
-            ) : (
-              <p>No strong matches found</p>
-            )}
-          </div>
+          {activeResume && (
+            <p className="active-resume">
+              Active: <strong>{activeResume.name}</strong>
+            </p>
+          )}
+
+          {!analysis ? <SkeletonLoader /> : (
+            <>
+              <div className="score-card">
+                <h3>Match Score</h3>
+                <ScoreRing score={analysis.score} />
+              </div>
+
+              <div className="keywords">
+                <h3>Missing Keywords</h3>
+                {analysis.missingKeywords?.length > 0 ? (
+                  <ul>
+                    {analysis.missingKeywords.map((kw, i) => (
+                      <li key={i}>{kw}</li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p>No missing keywords</p>
+                )}
+              </div>
+
+              <div className="keywords">
+                <h3>Strong Matches</h3>
+                {analysis.strongMatches?.length > 0 ? (
+                  <ul>
+                    {analysis.strongMatches.map((kw, i) => (
+                      <li key={i}>{kw}</li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p>No strong matches found</p>
+                )}
+              </div>
+            </>
+          )}
         </>
       )}
     </div>
